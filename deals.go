@@ -13,6 +13,8 @@ import (
 
 var client *http.Client
 
+var api_key = os.Getenv("hs-api-key")
+
 type DealHistory struct {
 	Deals []struct {
 		PortalID     int         `json:"portalId"`
