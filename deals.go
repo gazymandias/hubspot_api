@@ -2,19 +2,22 @@ package main
 
 import (
 	"bytes"
+	"cloud.google.com/go/storage"
+	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"net/url"
 	"strconv"
 	"time"
-	"os"
 )
 
 var client *http.Client
 
-var api_key = os.Getenv("hs-api-key")
+var apiKey = os.Getenv("hs-api-key")
 
 type DealHistory struct {
 	Deals []struct {
@@ -47,14 +50,14 @@ type DealHistory struct {
 	Offset  int  `json:"offset"`
 }
 
-func ConstructUrl(base_url string, propertiesWithHistory string, properties string, offset int) string {
-	base, base_err := url.Parse(base_url)
-	if base_err != nil {
-		return base_err.Error()
+func ConstructUrl(baseUrl string, propertiesWithHistory string, properties string, offset int) string {
+	base, baseErr := url.Parse(baseUrl)
+	if baseErr != nil {
+		return baseErr.Error()
 	}
 	// base.Path += ""
 	params := url.Values{}
-	params.Add("hapikey", api_key)
+	params.Add("hapikey", apiKey)
 	params.Add("limit", "250")
 	params.Add("propertiesWithHistory", propertiesWithHistory)
 	params.Add("properties", properties)
@@ -65,19 +68,18 @@ func ConstructUrl(base_url string, propertiesWithHistory string, properties stri
 	return base.String()
 }
 
-func GetDealHistory() {
+func GetDealHistory() []byte {
 	var dealHistory DealHistory
-	has_more := true
+	hasMore := true
 	count := 0
 	var buf bytes.Buffer
 	var offset int
-	for has_more {
-		url := ConstructUrl("https://api.hubapi.com/deals/v1/deal/paged", "dealstage", "dealId", offset)
-		err := GetJson(url, &dealHistory)
-		fmt.Println(url)
+	for hasMore {
+		constructUrl := ConstructUrl("https://api.hubapi.com/deals/v1/deal/paged", "dealstage", "dealId", offset)
+		err := GetJson(constructUrl, &dealHistory)
+		fmt.Println(constructUrl)
 		if err != nil {
 			fmt.Printf("error getting json: %s\n", err.Error())
-			return
 		} else {
 			fmt.Printf("successfully downloaded json - has more?: %+v\n", dealHistory.HasMore)
 
@@ -87,18 +89,18 @@ func GetDealHistory() {
 			}
 
 			count += 1
-			if count >= 85 {
-				has_more = false
+			if count >= 150 {
+				hasMore = false
 				break
 			}
-			has_more = dealHistory.HasMore
-			if !has_more {
+			hasMore = dealHistory.HasMore
+			if !hasMore {
 				break
 			}
 			offset = dealHistory.Offset
 		}
 	}
-	_ = ioutil.WriteFile("big_encode.json", buf.Bytes(), 0644)
+	return buf.Bytes()
 }
 
 func GetJson(url string, target interface{}) error {
@@ -106,11 +108,53 @@ func GetJson(url string, target interface{}) error {
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer func(Body io.ReadCloser) {
+		err := Body.Close()
+		if err != nil {
+
+		}
+	}(resp.Body)
 	return json.NewDecoder(resp.Body).Decode(target)
+}
+// streamFileUpload uploads to an object via a stream without reading to memory.
+func streamFileUpload(bucket string, object string) error {
+	ctx := context.Background()
+	client, err := storage.NewClient(ctx)
+	if err != nil {
+		return fmt.Errorf("storage.NewClient: %v", err)
+	}
+	defer func(client *storage.Client) {
+		err := client.Close()
+		if err != nil {
+		}
+	}(client)
+
+	buf := bytes.NewBuffer(GetDealHistory())
+	ctx, cancel := context.WithTimeout(ctx, time.Second*50)
+	defer cancel()
+
+	// Upload an object with storage.Writer.
+	wc := client.Bucket(bucket).Object(object).NewWriter(ctx)
+	wc.ChunkSize = 0 // note retries are not supported for chunk size 0.
+	if _, err = io.Copy(wc, buf); err != nil {
+		return fmt.Errorf("io.Copy: %v", err)
+	}
+	// Data can continue to be added to the file until the writer is closed.
+	if err := wc.Close(); err != nil {
+		return fmt.Errorf("Writer.Close: %v", err)
+	}
+	fmt.Printf("%v uploaded to %v.\n\n", object, bucket)
+
+	return nil
 }
 
 func main() {
+	start := time.Now()
 	client = &http.Client{Timeout: 10 * time.Second}
-	GetDealHistory()
+	err := streamFileUpload("", "output.json")
+	if err != nil {
+		return
+	}
+	elapsed := time.Since(start)
+	log.Printf("Process took %s", elapsed)
 }
