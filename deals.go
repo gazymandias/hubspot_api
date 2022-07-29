@@ -80,9 +80,11 @@ func GetDealHistory() []byte {
 		err := GetJson(constructUrl, &dealHistory)
 		fmt.Println(constructUrl)
 		if err != nil {
-			fmt.Printf("error getting json: %s\n", err.Error())
+			log.Error("error getting json: %s\n", err.Error())
+			//fmt.Printf("error getting json: %s\n", err.Error())
 		} else {
-			fmt.Printf("successfully downloaded json - has more?: %+v\n", dealHistory.HasMore)
+			log.Debug("successfully downloaded json - has more?: %+v\n", dealHistory.HasMore)
+// 			fmt.Printf("successfully downloaded json - has more?: %+v\n", dealHistory.HasMore)
 
 			for _, loc := range dealHistory.Deals {
 				encoder := json.NewEncoder(&buf)
