@@ -53,7 +53,7 @@ type DealHistory struct {
 func ConstructUrl(baseUrl string, propertiesWithHistory string, properties string, offset int) string {
 	base, baseErr := url.Parse(baseUrl)
 	if baseErr != nil {
-		log.Error("error getting json: %s\n", err.Error())
+		log.Error("error parsing url %s\n", baseErr)
 // 		return baseErr.Error()
 	}
 	// base.Path += ""
