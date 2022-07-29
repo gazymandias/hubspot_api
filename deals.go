@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"log"
+	log "github.com/sirupsen/logrus"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -143,12 +143,18 @@ func streamFileUpload(bucket string, object string) error {
 	if err := wc.Close(); err != nil {
 		return fmt.Errorf("Writer.Close: %v", err)
 	}
-	fmt.Printf("%v uploaded to %v.\n\n", object, bucket)
+	log.WithFields(
+		log.Fields{
+			"foo": "foo",
+			"bar": "bar",
+		},
+	).Info("%v uploaded to %v.\n\n", object, bucket)
 
 	return nil
 }
 
 func main() {
+	log.SetFormatter(&log.JSONFormatter{})
 	start := time.Now()
 	client = &http.Client{Timeout: 10 * time.Second}
 	err := streamFileUpload("", "output.json")
