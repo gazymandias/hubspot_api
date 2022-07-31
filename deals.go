@@ -162,7 +162,7 @@ func main() {
 	client = &http.Client{Timeout: 10 * time.Second}
 	err := streamFileUpload("", "output.json")
 	if err != nil {
-		return
+		log.Error("error getting data: %v\n", err)
 	}
 	elapsed := time.Since(start)
 	log.Printf("Process took %s", elapsed)
