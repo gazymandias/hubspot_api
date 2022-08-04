@@ -92,11 +92,11 @@ func GetDealHistory() []byte {
 			}
 
 			count += 1
-			if count >= 150 {
-				hasMore = false
-				break
-			}
 			hasMore = dealHistory.HasMore
+			if count >= 999 {
+				hasMore = false
+				log.Fatal("Process killed - unreasonable GET count: %s\n", count)
+			}
 			if !hasMore {
 				break
 			}
